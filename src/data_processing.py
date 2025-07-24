@@ -7,6 +7,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 import joblib
 
 # --- 1. Load data (simple helper function) ---
@@ -107,21 +109,78 @@ def build_preprocessing_pipeline(numeric_cols, categorical_cols):
     
     return full_pipeline
 
+#Calculate RFM and assign high-risk cluster ---
+def add_rfm_high_risk(df, snapshot_date=None, random_state=42):
+    df = df.copy()
+    # Ensure TransactionStartTime is datetime
+    df['TransactionStartTime'] = pd.to_datetime(df['TransactionStartTime'])
+    
+    # Define snapshot_date for Recency calculation (default to max date in data + 1 day)
+    if snapshot_date is None:
+        snapshot_date = df['TransactionStartTime'].max() + pd.Timedelta(days=1)
+
+    # Calculate RFM metrics grouped by CustomerId
+    rfm = df.groupby('CustomerId').agg({
+        'TransactionStartTime': lambda x: (snapshot_date - x.max()).days,  # Recency
+        'TransactionId': 'count',                                         # Frequency
+        'Amount': 'sum'                                                  # Monetary
+    }).rename(columns={
+        'TransactionStartTime': 'Recency',
+        'TransactionId': 'Frequency',
+        'Amount': 'Monetary'
+    })
+
+    # Handle any negative or zero monetary values by replacing with small positive (if needed)
+    rfm['Monetary'] = rfm['Monetary'].clip(lower=0.01)
+
+    # Scale RFM features before clustering
+    scaler = StandardScaler()
+    rfm_scaled = scaler.fit_transform(rfm)
+
+    # KMeans clustering into 3 clusters
+    kmeans = KMeans(n_clusters=3, random_state=random_state)
+    rfm['cluster'] = kmeans.fit_predict(rfm_scaled)
+
+    # Identify the cluster with highest risk: usually the cluster with highest Recency (most days since last purchase), and lowest Frequency & Monetary
+    cluster_summary = rfm.groupby('cluster').agg({
+        'Recency': 'mean',
+        'Frequency': 'mean',
+        'Monetary': 'mean'
+    })
+
+    # The "high risk" cluster is the one with highest Recency and lowest Frequency & Monetary.
+    # Define a score to identify: higher Recency + lower Frequency + lower Monetary = higher risk
+    cluster_summary['risk_score'] = cluster_summary['Recency'] - cluster_summary['Frequency'] - cluster_summary['Monetary']
+    high_risk_cluster = cluster_summary['risk_score'].idxmax()
+
+    # Create binary is_high_risk label: 1 if in high risk cluster else 0
+    rfm['is_high_risk'] = (rfm['cluster'] == high_risk_cluster).astype(int)
+
+    # Merge back is_high_risk label to original dataframe by CustomerId
+    df = df.merge(rfm['is_high_risk'], left_on='CustomerId', right_index=True, how='left')
+
+    print(f"[add_rfm_high_risk] Assigned high risk cluster: {high_risk_cluster}")
+    print(f"[add_rfm_high_risk] High risk customers count: {rfm['is_high_risk'].sum()}")
+
+    return df
 
 # --- 6. Full processing function ---
 def process_and_save(input_raw_path, output_X_path, output_y_path, pipeline_path=None):
     # Load raw data
     df = load_data(input_raw_path)
 
-    # Prepare target variable
-    y = df['FraudResult']
+    # --- TASK 4: Add proxy target variable is_high_risk ---
+    df = add_rfm_high_risk(df)
+
+    # Use is_high_risk as new target instead of FraudResult for credit risk modeling
+    y = df['is_high_risk']
 
     # Determine numeric and categorical columns from raw df BEFORE transformations
     numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
     categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
 
     # Remove columns we won't use as features
-    for col in ['FraudResult', 'TransactionId', 'BatchId', 'AccountId', 'SubscriptionId', 'CustomerId', 'TransactionStartTime']:
+    for col in ['is_high_risk', 'FraudResult', 'TransactionId', 'BatchId', 'AccountId', 'SubscriptionId', 'CustomerId', 'TransactionStartTime']:
         if col in numeric_cols:
             numeric_cols.remove(col)
         if col in categorical_cols:
@@ -148,7 +207,7 @@ def process_and_save(input_raw_path, output_X_path, output_y_path, pipeline_path
     # Create DataFrame from numpy array (dense now, so no problem)
     X_df = pd.DataFrame(X_processed, columns=feature_names)
 
-    # Save processed features and target
+    # Save processed features and new target
     X_df.to_csv(output_X_path, index=False)
     y.to_csv(output_y_path, index=False)
 

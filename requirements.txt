@@ -1,0 +1,13 @@
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+joblib
+mlflow
+pytest
+fastapi
+uvicorn
+flake8
+xverse
+woe
