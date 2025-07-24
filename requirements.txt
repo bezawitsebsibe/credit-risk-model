@@ -11,3 +11,4 @@ uvicorn
 flake8
 xverse
 woe
+pydantic
