@@ -1,0 +1,6 @@
+# Ignore data and environment files
+data/
+*.env
+__pycache__/
+.ipynb_checkpoints/
+*.pkl
