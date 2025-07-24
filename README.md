@@ -30,3 +30,24 @@ Task 3: Implement automated feature engineering pipeline
 - Added imputation, scaling, and one-hot encoding for clean feature processing
 - Output processed feature matrix and target for model training
 - Saved pipeline artifact for future inference and deployment
+
+
+### Task 4 - Proxy Target Variable Engineering
+- Created an RFM-based high-risk proxy label (`is_high_risk`) using transaction data.
+- Implemented feature engineering pipeline with datetime and aggregate features.
+- Added unit tests to verify data processing.
+
+### Task 5 - Model Training and Tracking
+- Developed training script with train/test split and model selection (Logistic Regression and Random Forest).
+- Included hyperparameter tuning with GridSearchCV.
+- Logged models, parameters, and metrics using MLflow.
+- Registered best model in MLflow Model Registry.
+- Added unit tests for helper functions.
+- CI pipeline runs linter and tests automatically.
+
+### Task 6 - Model Deployment and Continuous Integration
+- Created a REST API using FastAPI to serve model predictions.
+- Defined request/response schemas using Pydantic models.
+- Containerized API with Docker and docker-compose.
+- Set up GitHub Actions workflow to run linter and tests on each push.
+- Included requirements update with FastAPI, Uvicorn, MLflow, and linter.
