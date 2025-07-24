@@ -1,6 +1,16 @@
-# Ignore data and environment files
-data/
+# Ignore processed data files
+data/processed/
+# Keep raw data
+!data/raw/
+
+# Ignore environment files
 *.env
+
+# Python cache
 __pycache__/
+
+# Jupyter checkpoints
 .ipynb_checkpoints/
+
+# Pickle files
 *.pkl
