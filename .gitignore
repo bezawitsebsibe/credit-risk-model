@@ -1,7 +1,10 @@
-# Ignore processed data files
-data/processed/
-# Keep raw data
+# Ignore everything inside these folders
+data/raw/*
+data/processed/*
+
+# But don't ignore the folders themselves
 !data/raw/
+!data/processed/
 
 # Ignore environment files
 *.env
